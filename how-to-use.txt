@@ -1,0 +1,85 @@
+🛠️ BÖLÜM 1: İlk Kurulumlar (Sadece Bir Kez Yapılır)
+Bilgisayarınızda bu ortamı sıfırdan kurmak için aşağıdaki araçların yüklü olması gerekir:
+
+1. Temel Diller ve Ortamlar
+
+Python: Bilgisayarınıza python.org'dan Python (3.8 veya üzeri) kurun. (Kurulum ekranında "Add Python to PATH" kutucuğunu kesinlikle işaretleyin!)
+
+Node.js: Appium'un çalışması için nodejs.org'dan indirip kurun.
+
+2. Appium (Test Motoru) Kurulumu
+Terminali (CMD veya PowerShell) açıp şu komutları sırayla çalıştırın:
+
+Appium'u kurun: npm install -g appium
+
+Android sürücüsünü kurun: appium driver install uiautomator2
+
+3. Görsel IDE Kütüphaneleri
+Arayüzün çalışması için terminalde şu komutla gerekli Python paketlerini indirin:
+
+Bash
+pip install streamlit appium-python-client requests selenium
+🟢 BÖLÜM 2: Sistemi Çalıştırma (Her Test Öncesi)
+Test yazmaya veya çalıştırmaya başlamadan önce motorları şu sırayla çalıştırmalısınız:
+
+Cihazı Bağlayın: Test edilecek Android telefonu USB ile bilgisayara bağlayın (USB Hata Ayıklama açık olmalı) veya bir emülatör başlatın.
+
+Appium'u Başlatın: Yeni bir terminal (CMD) açın ve şu komutu girin:
+
+Bash
+appium --allow-cors
+(Bu ekranı arka planda hep açık bırakın).
+
+Görsel IDE'yi Açın: app.py dosyasının bulunduğu klasörde yeni bir terminal açın ve arayüzü başlatın:
+
+Bash
+streamlit run app.py
+Tarayıcınızda otomatik olarak renkli test tasarım panelimiz açılacaktır.
+
+🧩 BÖLÜM 3: Test Senaryosu (Case) Yazma
+Arayüz açıldığında sol taraf Kontrol Paneli, sağ taraf ise Üretilen Kod ekranıdır.
+
+Adım 1: Hedef Uygulamayı Belirleme
+Sol menüdeki "Ayarlar" kısmına test edeceğiniz uygulamanın kimliğini girin:
+
+App Package: Uygulamanın paket adı (Örn: com.odero.kurumsal).
+
+App Activity: Uygulamanın başlatıcı ana ekranı.
+
+Adım 2: Appium Inspector (Ekran Okuyucu) Kullanımı
+Telefondaki butonların adreslerini bulmak için inspector.appiumpro.com adresine girin.
+
+Telefondaki uygulamaya bağlanın.
+
+Ekranda tıklamak veya yazı yazmak istediğiniz butonu seçin.
+
+Sağ tarafta çıkan özellik tablosundaki JSON verisini (veya sadece XPATH değerini) kopyalayın.
+
+Adım 3: Senaryo ve Adım Ekleme
+Case Oluştur: Sol panelden testinize bir isim verin (Örn: basarili_giris) ve "➕ Yeni Case Oluştur" butonuna basın.
+
+İşlem Seç: "İşlem Tipi" menüsünden ne yapmak istediğinizi seçin (Tıkla, Metin Yaz, Kaydır, Bekle).
+
+Veriyi Yapıştır: Appium Inspector'dan kopyaladığınız veriyi "Hedef Alan" kutusuna yapıştırın. (Sistem, o uzun yazının içinden doğru adresi kendi süzecektir).
+
+Adımı Tuvale Ekle: "⬇️ Aktif Case'e Adım Ekle" butonuna basın. İşleminiz sağ taraftaki tuvale renkli bir blok olarak eklenecektir.
+
+Adım 4: Düzenleme ve Hata Ayıklama
+Tuvale eklediğiniz adımlarda değişiklik yapmak çok kolaydır:
+
+Düzenle: Adımın yanındaki "✏️" ikonuna basın. Altında açılan menüden hedef veriyi, yazılacak metni veya saniyeyi değiştirip kaydedin.
+
+Sil: Yanlış eklenen bir adımı veya komple senaryoyu yanındaki "🗑️" çöp kutusuna basarak silebilirsiniz.
+
+📥 BÖLÜM 4: Testi Dışa Aktarma ve Çalıştırma
+Tüm adımları görsel olarak ekledikten sonra:
+
+Sağ altta bulunan "📥 Kodu İndir (.py)" butonuna tıklayın. Sistem, çizdiğiniz senaryoları hatasız bir Python otomasyon dosyasına (otomasyon_testi.py) dönüştürüp indirecektir.
+
+İndirdiğiniz dosyanın bulunduğu klasörde terminal (CMD) açın.
+
+Testi koşturmak için şu komutu verin:
+
+Bash
+python otomasyon_testi.py
+Telefon, eklediğiniz adımları kendi kendine gerçekleştirmeye başlayacaktır.
