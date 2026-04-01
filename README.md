@@ -1,3 +1,5 @@
+Pilot streamlit website; https://moretester-g4elfaqxu7ib5u6ycykpnk.streamlit.app/
+
 Build your own appium test scenerious without code know-how
 
 Install requirements;
