@@ -1,0 +1,31 @@
+Pos Device
+{
+  "platformName": "Android", 
+  "appium:automationName": "UiAutomator2", 
+  "appium:deviceName": "OderoPOS", ---------> adb devices
+  "appium:noReset": true, 
+  "appium:waitForIdleTimeout": 0,
+  "appium:ignoreUnimportantViews": true,
+  "appium:disableWindowAnimation": true
+}
+
+Android UI
+{
+  "platformName": "Android",
+  "appium:automationName": "UiAutomator2",
+  "appium:noReset": true
+}
+
+Android App
+{
+  "platformName": "Android",
+  "appium:automationName": "UiAutomator2",
+  "appium:appPackage": "com.fbiego.chronos", ----------------------------> adb shell dumpsys window | find "mCurrentFocus"
+  "appium:appActivity": "com.fbiego.chronos.MainActivity",---------------> adb shell dumpsys window | find "mCurrentFocus"
+  "appium:noReset": true
+}
+
+Remote Settings;
+Remote Host: 127.0.0.1
+Remote Port: 4723
+Remote Path: /
