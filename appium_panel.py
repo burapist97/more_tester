@@ -316,6 +316,7 @@ with col_canvas:
 with col_code:
     st.subheader(f"📄 Üretilen Python Kodu ({st.session_state.platform})")
     
+    # YENİ CLOUD-READY MOTOR BURADAN BAŞLIYOR
     gen_code = f"""import time
 import requests
 import json
@@ -500,6 +501,7 @@ def ekran_kaydir(driver, yon, x=0, y=0):
             elif act == "Metin Yaz":
                 safe_val = step.get("val", "").replace("'", "\\'")
                 gen_code += f"        kutu = akilli_element_bulucu(driver, r'''{step.get('xpath','')}''')\n"
+                gen_code += f"        kutu.click(); time.sleep(0.5)\n" 
                 gen_code += f"        kutu.clear(); kutu.send_keys('{safe_val}'); time.sleep(1)\n"
             elif act == "Sistem Tuşu":
                 sk = step.get("sys_key", "")
