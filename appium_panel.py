@@ -412,13 +412,13 @@ def akilli_element_bulucu(driver, locator):
 def ekran_kaydir(driver, yon, x=0, y=0):
     size = driver.get_window_size()
     
-    # Eger kullanici (0,0) disinda bir koordinat verdiyse orayi merkez al, vermediyse ekranin ortasini merkez al
+    # KULLANICI X,Y VERMEDIYSE EKRANIN EN SOLUNU (%5) MERKEZ AL (Kutulara dokunmamak icin)
     if x > 0 or y > 0:
         merkez_x = x
         merkez_y = y
     else:
-        merkez_x = int(size['width'] / 2)
-        merkez_y = int(size['height'] / 2)
+        merkez_x = int(size['width'] * 0.05) if yon in ['down', 'up'] else int(size['width'] / 2)
+        merkez_y = int(size['height'] / 2) if yon in ['down', 'up'] else int(size['height'] * 0.1)
         
     start_x, start_y = merkez_x, merkez_y
     end_x, end_y = merkez_x, merkez_y
@@ -450,7 +450,7 @@ def ekran_kaydir(driver, yon, x=0, y=0):
         actions.w3c_actions = ActionBuilder(driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
         actions.w3c_actions.pointer_action.move_to_location(start_x, start_y)
         actions.w3c_actions.pointer_action.pointer_down()
-        actions.w3c_actions.pointer_action.pause(0.5)
+        actions.w3c_actions.pointer_action.pause(0.05) # SÜRE KISALTILDI (Kutulara Tıklanmaması Icin)
         actions.w3c_actions.pointer_action.move_to_location(end_x, end_y)
         actions.w3c_actions.pointer_action.pointer_up()
         actions.perform()
