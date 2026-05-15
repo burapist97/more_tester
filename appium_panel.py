@@ -32,7 +32,7 @@ st.markdown("""
     .s-swipe { background-color: #FFBF00; color: #333; } 
     .s-wait { background-color: #9966FF; } 
     .s-sys { background-color: #8A9BAC; } 
-    .s-clear { background-color: #E74C3C; } /* Kutuyu Temizle rengi */
+    .s-clear { background-color: #E74C3C; }
     
     .s-val {
         background: white;
@@ -169,10 +169,10 @@ with st.sidebar:
         elif action == "Kaydır (Swipe)":
             direction = st.selectbox("Yön:", ["Aşağı", "Yukarı", "Sağa", "Sola"])
             count = st.number_input("Tekrar Sayısı:", min_value=1, value=1)
-            st.caption("Kaydırmanın yapılacağı alanın merkez X ve Y koordinatları (Tüm ekran için 0 bırakın):")
+            st.caption("Kaydırmanın Merkez Koordinatları (Tüm ekranın ortası için 0 bırakın):")
             c1, c2 = st.columns(2)
-            with c1: step_x = st.number_input("X (Koordinat):", value=0, key="sw_x")
-            with c2: step_y = st.number_input("Y (Koordinat):", value=0, key="sw_y")
+            with c1: step_x = st.number_input("X (Koor):", value=0, key="sw_x")
+            with c2: step_y = st.number_input("Y (Koor):", value=0, key="sw_y")
             
         elif action == "Sistem Tuşu":
             sys_key = st.selectbox("Tuş Seçimi:", ["Geri", "Ana Sayfa", "Arka Plan", "Klavyeyi Kapat", "Kutuyu Temizle"])
@@ -240,7 +240,7 @@ with col_canvas:
                 if step.get("x", 0) > 0 or step.get("y", 0) > 0:
                     info = f'<span class="s-val">{step.get("direction", "Aşağı")} (Merkez X:{step.get("x",0)} Y:{step.get("y",0)}) x{step.get("count", 1)}</span>'
                 else:
-                    info = f'<span class="s-val">{step.get("direction", "Aşağı")} x{step.get("count", 1)}</span>'
+                    info = f'<span class="s-val">{step.get("direction", "Aşağı")} (Ekran Ortası) x{step.get("count", 1)}</span>'
             elif act == "Bekle (Sleep)": css, icon = "s-wait", "⏳"
             elif act == "Sistem Tuşu": 
                 if step.get("sys_key") == "Kutuyu Temizle":
@@ -316,7 +316,6 @@ with col_canvas:
 with col_code:
     st.subheader(f"📄 Üretilen Python Kodu ({st.session_state.platform})")
     
-    # YENİ CLOUD-READY MOTOR BURADAN BAŞLIYOR
     gen_code = f"""import time
 import requests
 import json
@@ -375,16 +374,27 @@ def akilli_element_bulucu(driver, locator):
     locator = str(locator).strip()
     if not locator: raise Exception("Hedef veri (XPath/ID) bos birakilmis!")
     
-    # --- YENİ: KULLANICI HATASINI DÜZELTEN OTOMATİK KISALTICI ---
     if locator.count("/") > 3 and "android.widget" in locator:
         son_dugum = locator.split("/")[-1]
-        if son_dugum.startswith("android.") or son_dugum.startswith("android.widget."):
+        if ("@" in son_dugum) and (son_dugum.startswith("android.") or son_dugum.startswith("android.widget.")):
             yeni_locator = "//" + son_dugum
-            print("[AKILLI BULUCU] Kirilgan XPath tespit edildi! Suna donusturuldu: " + yeni_locator)
+            print("[AKILLI BULUCU] Kirilgan XPath kisaltildi: " + yeni_locator)
             locator = yeni_locator
-    # -------------------------------------------------------------
+
+    if ("[@content-desc=" in locator or "[@text=" in locator) and ("'" in locator or '"' in locator):
+        try:
+            attr_part = locator.split("[@")[1].split("=")[0]
+            val_part = locator.split("=")[1].split("]")[0].replace('"', '').replace("'", "")
+            
+            if len(val_part) > 12 or " " in val_part or "\\n" in val_part:
+                kelimeler = re.findall(r'[\\wİıÖöÜüŞşÇçĞğ]+', val_part)
+                if kelimeler:
+                    secilen_kelime = sorted([k for k in kelimeler if len(k) >= 4], key=len, reverse=True)[0]
+                    locator = f"//*[contains(@{{attr_part}}, '{{secilen_kelime}}')]"
+        except Exception:
+            pass
     
-    if locator.startswith("//") or locator.startswith("hierarchy"):
+    if locator.startswith("//") or locator.startswith("(") or locator.startswith("hierarchy"):
         return driver.find_element(by=AppiumBy.XPATH, value=locator)
     
     acc_id_match = re.search(r'"accessibility[-_]id"\\s*:\\s*"([^"]+)"', locator, re.IGNORECASE) or re.search(r'accessibility id\\s*:\\s*([^\\n]+)', locator, re.IGNORECASE)
@@ -401,10 +411,14 @@ def akilli_element_bulucu(driver, locator):
 def ekran_kaydir(driver, yon, x=0, y=0):
     size = driver.get_window_size()
     
-    # Eger kullanici X,Y koordinati verdiyse orayi merkez al, vermediyse ekranin ortasini merkez al
-    merkez_x = x if x > 0 else int(size['width'] / 2)
-    merkez_y = y if y > 0 else int(size['height'] / 2)
-    
+    # Eger kullanici (0,0) disinda bir koordinat verdiyse orayi merkez al, vermediyse ekranin ortasini merkez al
+    if x > 0 or y > 0:
+        merkez_x = x
+        merkez_y = y
+    else:
+        merkez_x = int(size['width'] / 2)
+        merkez_y = int(size['height'] / 2)
+        
     start_x, start_y = merkez_x, merkez_y
     end_x, end_y = merkez_x, merkez_y
     
@@ -412,15 +426,19 @@ def ekran_kaydir(driver, yon, x=0, y=0):
     y_offset = int(size['height'] * 0.25)
     
     if yon == 'down': 
-        start_y += y_offset; end_y -= y_offset
+        start_y += y_offset
+        end_y -= y_offset
     elif yon == 'up': 
-        start_y -= y_offset; end_y += y_offset
+        start_y -= y_offset
+        end_y += y_offset
     elif yon == 'right': 
-        start_x -= x_offset; end_x += x_offset
+        start_x -= x_offset
+        end_x += x_offset
     elif yon == 'left': 
-        start_x += x_offset; end_x -= x_offset
+        start_x += x_offset
+        end_x -= x_offset
         
-    # Ekran disina cikmasini engelle (hata vermemesi icin)
+    # Appium'un ekran disina tasip cokmemesi icin sinirlari guvenceye aliyoruz
     start_x = max(10, min(size['width'] - 10, start_x))
     start_y = max(10, min(size['height'] - 10, start_y))
     end_x = max(10, min(size['width'] - 10, end_x))
