@@ -144,32 +144,57 @@ with st.sidebar:
         step_name = st.text_input("Adım İsmi (Boş bırakırsanız otomatik verilir):", placeholder="Örn: Ayarlara Tıkla")
         
         xpath, val, count, direction, step_x, step_y, sys_key = "", "", 1, "Aşağı", 0, 0, "Geri"
+        fragile_text = ""
         
         if action == "Tıkla": 
             xpath = st.text_area("Hedef Alan (Boş bırakıp koordinat girebilirsiniz):")
+            
+            if xpath and ("//" in xpath) and ("@" not in xpath) and ("[" in xpath):
+                st.warning("⚠️ Bu yol kırılgan görünüyor (sıra numarasına dayanıyor). Sayfa kaydığında bozulabilir! Daha sağlam olması için buton üzerinde yazan yazıyı (birebir) aşağıya girin:")
+                fragile_text = st.text_input("Buton Üzerindeki Yazı:")
+                
             c1, c2 = st.columns(2)
             with c1: step_x = st.number_input("X (Koordinat):", value=0)
             with c2: step_y = st.number_input("Y (Koordinat):", value=0)
+            
         elif action == "Metin Yaz": 
             xpath = st.text_area("Hedef Alan (JSON/XPATH):")
+            
+            if xpath and ("//" in xpath) and ("@" not in xpath) and ("[" in xpath):
+                st.warning("⚠️ Bu yol kırılgan görünüyor. Daha sağlam olması için lütfen kutu üzerinde yazan yazıyı (birebir) aşağıya girin:")
+                fragile_text = st.text_input("Kutu Üzerindeki İpucu/Yazı:")
+            
             val = st.text_input("Yazılacak Değer:")
+            
         elif action == "Kaydır (Swipe)":
             direction = st.selectbox("Yön:", ["Aşağı", "Yukarı", "Sağa", "Sola"])
             count = st.number_input("Tekrar Sayısı:", min_value=1, value=1)
+            st.caption("Kaydırmanın yapılacağı alanın merkez X ve Y koordinatları (Tüm ekran için 0 bırakın):")
+            c1, c2 = st.columns(2)
+            with c1: step_x = st.number_input("X (Koordinat):", value=0, key="sw_x")
+            with c2: step_y = st.number_input("Y (Koordinat):", value=0, key="sw_y")
+            
         elif action == "Sistem Tuşu":
             sys_key = st.selectbox("Tuş Seçimi:", ["Geri", "Ana Sayfa", "Arka Plan", "Klavyeyi Kapat", "Kutuyu Temizle"])
-            # Eğer Kutuyu Temizle seçilirse XPATH iste
             if sys_key == "Kutuyu Temizle":
                 xpath = st.text_area("Hedef Alan (JSON/XPATH) - Silinecek Kutu:")
+                if xpath and ("//" in xpath) and ("@" not in xpath) and ("[" in xpath):
+                    st.warning("⚠️ Bu yol kırılgan görünüyor. Daha sağlam olması için lütfen kutu üzerinde yazan yazıyı aşağıya girin:")
+                    fragile_text = st.text_input("Kutu Üzerindeki Yazı:")
+                
         elif action == "Bekle (Sleep)": 
             val = st.number_input("Saniye:", min_value=1, value=1)
         
         if st.button("⬇️ Aktif Case'e Adım Ekle", use_container_width=True):
+            final_xpath = xpath
+            if fragile_text:
+                final_xpath = f"//*[contains(@content-desc, '{fragile_text}') or contains(@text, '{fragile_text}')]"
+
             if not step_name:
-                step_name = akilli_isim_uret(action, xpath, val, direction, sys_key, step_x, step_y)
+                step_name = akilli_isim_uret(action, final_xpath, val, direction, sys_key, step_x, step_y)
 
             st.session_state.cases[-1]["steps"].append({
-                "step_name": step_name, "action": action, "xpath": xpath, "val": str(val), 
+                "step_name": step_name, "action": action, "xpath": final_xpath, "val": str(val), 
                 "count": count, "direction": direction, "x": step_x, "y": step_y, "sys_key": sys_key
             })
             st.rerun()
@@ -210,7 +235,12 @@ with col_canvas:
                 css, icon = "s-click", "👆"
                 if step.get("x", 0) > 0 or step.get("y", 0) > 0: info = f'<span class="s-val">X:{step["x"]} Y:{step["y"]}</span>'
             elif act == "Metin Yaz": css, icon = "s-type", "⌨️"
-            elif act == "Kaydır (Swipe)": css, icon, info = "s-swipe", "↔️", f'<span class="s-val">{step.get("direction", "Aşağı")} x{step.get("count", 1)}</span>'
+            elif act == "Kaydır (Swipe)": 
+                css, icon = "s-swipe", "↔️"
+                if step.get("x", 0) > 0 or step.get("y", 0) > 0:
+                    info = f'<span class="s-val">{step.get("direction", "Aşağı")} (Merkez X:{step.get("x",0)} Y:{step.get("y",0)}) x{step.get("count", 1)}</span>'
+                else:
+                    info = f'<span class="s-val">{step.get("direction", "Aşağı")} x{step.get("count", 1)}</span>'
             elif act == "Bekle (Sleep)": css, icon = "s-wait", "⏳"
             elif act == "Sistem Tuşu": 
                 if step.get("sys_key") == "Kutuyu Temizle":
@@ -243,8 +273,14 @@ with col_canvas:
                 st.markdown('<div class="edit-box">', unsafe_allow_html=True)
                 step["step_name"] = st.text_input("Adım Adı:", value=step.get("step_name", ""), key=f"edit_name_{c_idx}_{s_idx}")
                 
-                if act in ["Tıkla", "Metin Yaz"]:
+                if act in ["Tıkla", "Metin Yaz"] or (act == "Sistem Tuşu" and step.get("sys_key") == "Kutuyu Temizle"):
                     step["xpath"] = st.text_area("Hedef Veri (JSON/XPATH):", value=step.get("xpath", ""), key=f"edit_xp_{c_idx}_{s_idx}")
+                    if step["xpath"] and ("//" in step["xpath"]) and ("@" not in step["xpath"]) and ("[" in step["xpath"]):
+                        st.warning("⚠️ Bu yol kırılgan. Daha sağlam olması için üzerindeki yazıyı (birebir) aşağıya girebilirsiniz:")
+                        edit_fragile = st.text_input("Üzerindeki Yazı:", key=f"edit_fragile_{c_idx}_{s_idx}")
+                        if edit_fragile:
+                            step["xpath"] = f"//*[contains(@content-desc, '{edit_fragile}') or contains(@text, '{edit_fragile}')]"
+                            
                 if act == "Tıkla":
                     ec1, ec2 = st.columns(2)
                     with ec1: step["x"] = st.number_input("X (Koor):", value=step.get("x", 0), key=f"edit_x_{c_idx}_{s_idx}")
@@ -257,9 +293,6 @@ with col_canvas:
                     dirs = ["Geri", "Ana Sayfa", "Arka Plan", "Klavyeyi Kapat", "Kutuyu Temizle"]
                     idx = dirs.index(step.get("sys_key", "Geri")) if step.get("sys_key", "Geri") in dirs else 0
                     step["sys_key"] = st.selectbox("Tuş Seçimi:", dirs, index=idx, key=f"edit_sys_{c_idx}_{s_idx}")
-                    # Eğer edit ekranında Kutuyu Temizle seçiliyse XPATH iste
-                    if step["sys_key"] == "Kutuyu Temizle":
-                        step["xpath"] = st.text_area("Hedef Veri (JSON/XPATH):", value=step.get("xpath", ""), key=f"edit_xp_sys_{c_idx}_{s_idx}")
 
                 if act == "Kaydır (Swipe)":
                     col_d1, col_d2 = st.columns(2)
@@ -269,6 +302,10 @@ with col_canvas:
                         step["direction"] = st.selectbox("Yön:", dirs, index=idx, key=f"edit_dir_{c_idx}_{s_idx}")
                     with col_d2:
                         step["count"] = st.number_input("Tekrar:", min_value=1, value=int(step.get("count", 1)), key=f"edit_count_{c_idx}_{s_idx}")
+                    st.caption("Kaydırmanın Merkez Koordinatları (Tüm ekran için 0 bırakın):")
+                    ec1, ec2 = st.columns(2)
+                    with ec1: step["x"] = st.number_input("X (Koor):", value=step.get("x", 0), key=f"edit_sx_{c_idx}_{s_idx}")
+                    with ec2: step["y"] = st.number_input("Y (Koor):", value=step.get("y", 0), key=f"edit_sy_{c_idx}_{s_idx}")
                 
                 if st.button("✅ Kaydet ve Kapat", key=f"save_{c_idx}_{s_idx}", use_container_width=True):
                     st.session_state.editing_step = None
@@ -338,6 +375,15 @@ def akilli_element_bulucu(driver, locator):
     locator = str(locator).strip()
     if not locator: raise Exception("Hedef veri (XPath/ID) bos birakilmis!")
     
+    # --- YENİ: KULLANICI HATASINI DÜZELTEN OTOMATİK KISALTICI ---
+    if locator.count("/") > 3 and "android.widget" in locator:
+        son_dugum = locator.split("/")[-1]
+        if son_dugum.startswith("android.") or son_dugum.startswith("android.widget."):
+            yeni_locator = "//" + son_dugum
+            print("[AKILLI BULUCU] Kirilgan XPath tespit edildi! Suna donusturuldu: " + yeni_locator)
+            locator = yeni_locator
+    # -------------------------------------------------------------
+    
     if locator.startswith("//") or locator.startswith("hierarchy"):
         return driver.find_element(by=AppiumBy.XPATH, value=locator)
     
@@ -352,14 +398,34 @@ def akilli_element_bulucu(driver, locator):
     
     return driver.find_element(by=AppiumBy.ID, value=locator)
 
-def ekran_kaydir(driver, yon):
+def ekran_kaydir(driver, yon, x=0, y=0):
     size = driver.get_window_size()
-    start_x, start_y = int(size['width'] / 2), int(size['height'] / 2)
-    end_x, end_y = start_x, start_y
-    if yon == 'down': start_y, end_y = int(size['height'] * 0.75), int(size['height'] * 0.25)
-    elif yon == 'up': start_y, end_y = int(size['height'] * 0.25), int(size['height'] * 0.75)
-    elif yon == 'right': start_x, end_x = int(size['width'] * 0.25), int(size['width'] * 0.75)
-    elif yon == 'left': start_x, end_x = int(size['width'] * 0.75), int(size['width'] * 0.25)
+    
+    # Eger kullanici X,Y koordinati verdiyse orayi merkez al, vermediyse ekranin ortasini merkez al
+    merkez_x = x if x > 0 else int(size['width'] / 2)
+    merkez_y = y if y > 0 else int(size['height'] / 2)
+    
+    start_x, start_y = merkez_x, merkez_y
+    end_x, end_y = merkez_x, merkez_y
+    
+    x_offset = int(size['width'] * 0.25)
+    y_offset = int(size['height'] * 0.25)
+    
+    if yon == 'down': 
+        start_y += y_offset; end_y -= y_offset
+    elif yon == 'up': 
+        start_y -= y_offset; end_y += y_offset
+    elif yon == 'right': 
+        start_x -= x_offset; end_x += x_offset
+    elif yon == 'left': 
+        start_x += x_offset; end_x -= x_offset
+        
+    # Ekran disina cikmasini engelle (hata vermemesi icin)
+    start_x = max(10, min(size['width'] - 10, start_x))
+    start_y = max(10, min(size['height'] - 10, start_y))
+    end_x = max(10, min(size['width'] - 10, end_x))
+    end_y = max(10, min(size['height'] - 10, end_y))
+
     try:
         actions = ActionChains(driver)
         actions.w3c_actions = ActionBuilder(driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
@@ -423,12 +489,14 @@ def ekran_kaydir(driver, yon):
                 elif sk == "Geri": gen_code += "        driver.press_keycode(4)\n"
                 elif sk == "Ana Sayfa": gen_code += "        driver.press_keycode(3)\n"
                 elif sk == "Arka Plan": gen_code += "        driver.press_keycode(187)\n"
-                elif sk == "Kutuyu Temizle": # Python kodu üreten kısım
+                elif sk == "Kutuyu Temizle":
                     gen_code += f"        kutu = akilli_element_bulucu(driver, r'''{step.get('xpath','')}''')\n"
                     gen_code += f"        kutu.clear(); time.sleep(1)\n"
             elif act == "Kaydır (Swipe)":
                 dir_map = {"Aşağı": "down", "Yukarı": "up", "Sağa": "right", "Sola": "left"}
-                gen_code += f"        for _ in range({step.get('count',1)}):\n            ekran_kaydir(driver, '{dir_map.get(step.get('direction','Aşağı'))}')\n            time.sleep(0.5)\n"
+                s_dir = dir_map.get(step.get('direction','Aşağı'))
+                sx, sy = step.get('x', 0), step.get('y', 0)
+                gen_code += f"        for _ in range({step.get('count',1)}):\n            ekran_kaydir(driver, '{s_dir}', {sx}, {sy})\n            time.sleep(0.5)\n"
             elif act == "Bekle (Sleep)":
                 gen_code += f"        time.sleep({step.get('val',1)})\n"
                 
