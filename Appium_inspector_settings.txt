@@ -20,8 +20,8 @@ Android App
 {
   "platformName": "Android",
   "appium:automationName": "UiAutomator2",
-  "appium:appPackage": "com.fbiego.chronos", ----------------------------> adb shell dumpsys window | find "mCurrentFocus"
-  "appium:appActivity": "com.fbiego.chronos.MainActivity",---------------> adb shell dumpsys window | find "mCurrentFocus"
+  "appium:appPackage": "com.fbiego.chronos", ----------------------------> adb shell dumpsys window | find "mCurrentFocus"/adb shell dumpsys window | grep "mCurrentFocus"
+  "appium:appActivity": "com.fbiego.chronos.MainActivity",---------------> adb shell dumpsys window | find "mCurrentFocus"/adb shell dumpsys window | grep "mCurrentFocus"
   "appium:noReset": true
 }
 
