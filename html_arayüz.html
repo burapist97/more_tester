@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Divan Test Otomasyon IDE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        pre code { font-family: 'Courier New', Courier, monospace; }
+        
+        .step-Tıkla { border-left-color: #3b82f6; background-color: #eff6ff; }
+        .step-Metin { border-left-color: #22c55e; background-color: #f0fdf4; }
+        .step-Kaydır { border-left-color: #f97316; background-color: #fff7ed; }
+        .step-Sistem { border-left-color: #a855f7; background-color: #faf5ff; }
+        .step-Bekle { border-left-color: #64748b; background-color: #f8fafc; }
+        .step-Başlık { border-left-color: #eab308; background-color: #fefce8; }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col font-sans overflow-hidden">
+
+    <!-- AÇILIŞ MODALI -->
+    <div id="startup-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-xl p-6 w-[28rem] shadow-2xl">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">D</div>
+                <h3 class="text-xl font-semibold text-gray-800">Projeye Hoş Geldiniz</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-5">Lütfen oluşturulacak Python test dosyasının adını belirleyin.</p>
+            <input type="text" id="startup-filename" class="w-full border border-gray-300 rounded-lg p-3 mb-5 focus:outline-none focus:border-blue-500" placeholder="test_senaryosu.py">
+            <button onclick="closeStartupModal()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium">
+                Çalışma Alanına Git
+            </button>
+        </div>
+    </div>
+
+    <!-- ÜST MENÜ (HEADER) -->
+    <header class="bg-white border-b border-gray-200 h-16 flex items-center px-6 justify-between shrink-0">
+        <div class="flex items-center gap-4">
+            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">D</div>
+            <div class="text-sm text-gray-500 flex items-center gap-2">
+                <span>New Test App</span>
+                <span class="text-gray-300">/</span>
+                <input type="text" id="header-filename-display" value="test_script.py" onchange="updateFileName(this.value)" class="text-gray-900 font-medium bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5 transition-colors w-48 text-sm cursor-text" title="Dosya adını değiştirmek için tıklayın">
+            </div>
+        </div>
+    </header>
+
+    <!-- ANA İÇERİK (3 KOLON) -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- 1. SOL KOLON -->
+        <div class="w-[22rem] bg-white border-r border-gray-200 flex flex-col shrink-0 overflow-y-auto">
+            
+            <!-- Proje Yönetimi -->
+            <div class="p-5 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2"><span class="text-lg">📁</span> Proje Yönetimi</h3>
+                <label class="block text-xs font-medium text-gray-600 mb-2">Kayıtlı Testi Yükle (.py)</label>
+                <input type="file" id="file-upload" accept=".py" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-200 rounded-md cursor-pointer">
+            </div>
+
+            <!-- Temel Ayarlar -->
+            <div class="p-5 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2"><span class="text-lg">⚙️</span> Temel Ayarlar</h3>
+                <label class="block text-xs font-medium text-gray-600 mb-2">Platform Seçimi:</label>
+                <div class="flex gap-4 mb-4">
+                    <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="platform" value="Android" checked class="w-4 h-4 text-blue-600" onchange="updatePlatform()"> Android</label>
+                    <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="platform" value="iOS" class="w-4 h-4 text-blue-600" onchange="updatePlatform()"> iOS</label>
+                </div>
+                <div id="android-settings" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">App Package</label>
+                        <input type="text" id="app-pkg" class="w-full border border-gray-300 rounded p-2 text-sm focus:border-blue-500" placeholder="com.example.app" oninput="updateSettings()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">App Activity</label>
+                        <input type="text" id="app-act" class="w-full border border-gray-300 rounded p-2 text-sm focus:border-blue-500" placeholder="MainActivity" oninput="updateSettings()">
+                    </div>
+                </div>
+                <div id="ios-settings" class="space-y-3 hidden">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Bundle ID</label>
+                        <input type="text" id="bundle-id" class="w-full border border-gray-300 rounded p-2 text-sm focus:border-blue-500" placeholder="com.example.app" oninput="updateSettings()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Senaryo Ekle -->
+            <div class="p-5 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2"><span class="text-lg">🧱</span> Senaryo Ekle</h3>
+                <input type="text" id="new-case-name" class="w-full border border-gray-300 rounded p-2 text-sm mb-3 focus:border-blue-500" placeholder="Örn: para_yukleme_testi">
+                <button onclick="addScenario()" class="w-full bg-[#f44336] text-white py-2 rounded hover:bg-[#d32f2f] transition font-medium flex items-center justify-center gap-2">
+                    <span class="text-lg font-bold">+</span> Yeni Case Oluştur
+                </button>
+            </div>
+
+            <!-- Adım (Blok) Ekleme Alanı -->
+            <div id="step-form-wrapper" class="p-5 bg-blue-50/30 flex-1 flex flex-col transition-colors">
+                <h3 id="form-title-text" class="font-semibold text-gray-800 mb-3 flex items-center gap-2"><span class="text-lg">🧩</span> Blok (Adım) Ekle</h3>
+                
+                <div id="no-case-warning" class="bg-yellow-50 text-yellow-800 text-[13px] p-3 rounded border border-yellow-200 mb-4 transition-all">
+                    Adım ekleyebilmek için lütfen önce yukarıdan bir <b>Yeni Case</b> oluşturun.
+                </div>
+
+                <div id="step-form-container" class="space-y-4 transition-all opacity-50 pointer-events-none">
+                    
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Hedef Senaryo</label>
+                            <select id="target-case-select" onchange="updatePositionDropdown()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white"></select>
+                        </div>
+                        <div id="step-position-container" class="w-1/3">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Konum</label>
+                            <select id="form-step-position" class="w-full border border-gray-300 rounded p-2 text-sm bg-white text-blue-700 font-medium"></select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Adım İsmi</label>
+                        <input type="text" id="form-step-name" class="w-full border border-gray-300 rounded p-2 text-sm bg-white" placeholder="Örn: Giriş butonuna tıkla">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Aksiyon Tipi</label>
+                        <select id="form-action" class="w-full border border-gray-300 rounded p-2 text-sm bg-white" onchange="toggleFormFields()">
+                            <option value="Tıkla">Tıkla</option>
+                            <option value="Metin Yaz">Metin Yaz</option>
+                            <option value="Güvenli Metin Yaz (Fiziksel)">Güvenli Metin Yaz (Fiziksel)</option>
+                            <option value="Kaydır (Swipe)">Kaydır (Swipe)</option>
+                            <option value="Sistem Tuşu">Sistem Tuşu</option>
+                            <option value="Bekle (Sleep)">Bekle (Sleep)</option>
+                            <option value="Başlık / Yorum">Başlık / Yorum</option>
+                        </select>
+                    </div>
+
+                    <!-- Dinamik Alanlar -->
+                    <div id="form-field-xpath" class="space-y-1">
+                        <label class="block text-xs font-medium text-gray-600">Hedef (XPath / ID)</label>
+                        <input type="text" id="form-xpath" class="w-full border border-gray-300 rounded p-2 text-sm bg-white font-mono" placeholder="//*[@text='Login']">
+                        <div class="flex items-center gap-2 pt-1">
+                            <input type="checkbox" id="form-exact" class="rounded text-blue-600">
+                            <label class="text-xs text-gray-600">Tam Eşleşme (Exact Match)</label>
+                        </div>
+                    </div>
+
+                    <div id="form-field-coords" class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">X Koor.</label>
+                            <input type="number" id="form-x" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Y Koor.</label>
+                            <input type="number" id="form-y" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
+                        </div>
+                    </div>
+
+                    <div id="form-field-val">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Değer / Metin / Saniye</label>
+                        <input type="text" id="form-val" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
+                    </div>
+                    
+                    <div id="form-field-count">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Tekrar Sayısı</label>
+                        <input type="number" id="form-count" value="1" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
+                    </div>
+
+                    <div id="form-field-syskey" class="hidden">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Sistem Tuşu</label>
+                        <select id="form-syskey" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
+                            <option value="Geri">Geri</option>
+                            <option value="Klavyeyi Kapat">Klavyeyi Kapat</option>
+                            <option value="Ana Sayfa">Ana Sayfa</option>
+                            <option value="Kutuyu Temizle">Kutuyu Temizle</option>
+                            <option value="Fiziksel Sil (Backspace)">Fiziksel Sil (Backspace)</option>
+                        </select>
+                    </div>
+
+                    <div id="form-field-direction" class="hidden">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Kaydırma Yönü</label>
+                        <select id="form-direction" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
+                            <option value="Aşağı">Aşağı</option>
+                            <option value="Yukarı">Yukarı</option>
+                            <option value="Sağa">Sağa</option>
+                            <option value="Sola">Sola</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-2 mt-2">
+                        <button id="btn-cancel-edit" onclick="cancelEdit()" class="hidden w-1/3 bg-gray-200 text-gray-700 py-2.5 rounded hover:bg-gray-300 transition font-medium">İptal</button>
+                        <button id="btn-add-step" onclick="saveStep()" class="flex-1 bg-blue-600 text-white py-2.5 rounded hover:bg-blue-700 transition font-medium shadow-sm">Adımı Ekle</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. ORTA KOLON (Görselleştirme / Tuval) -->
+        <div class="flex-1 bg-gray-100 border-r border-gray-200 flex flex-col min-w-[400px]">
+            <div class="p-4 border-b border-gray-200 bg-white shadow-sm z-10 flex justify-between items-center">
+                <h2 class="font-semibold text-gray-800 flex items-center gap-2">🎨 Senaryo Görünümleri</h2>
+                <div class="flex items-center gap-4">
+                    <span class="text-xs text-gray-500 hidden xl:block">Adımlar soldaki menüden eklenir veya düzenlenir.</span>
+                    <button onclick="clearAll()" class="text-xs bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 py-1.5 px-3 rounded shadow-sm font-medium">
+                        🗑️ Tümünü Temizle
+                    </button>
+                </div>
+            </div>
+            <div id="canvas-area" class="flex-1 overflow-y-auto p-6 space-y-6"></div>
+        </div>
+
+        <!-- 3. SAĞ KOLON (Python Kod Görüntüsü) -->
+        <div class="flex-1 bg-white flex flex-col min-w-[400px]">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 shadow-sm z-10">
+                <h2 class="font-semibold text-gray-800">Python Code (<span id="code-platform-title">Android</span>)</h2>
+                <button onclick="exportCode()" class="flex items-center gap-2 bg-white hover:bg-blue-50 text-gray-700 text-sm font-medium py-1.5 px-4 rounded border border-gray-300 shadow-sm transition">
+                    <span>📤</span> <span>Dışa Aktar</span>
+                </button>
+            </div>
+            <div class="flex-1 p-4 bg-[#1e1e1e] overflow-y-auto text-blue-300 text-[13px] leading-relaxed">
+                <pre><code id="generated-code-block"># Şablon yükleniyor...</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // GITHUB RAW LİNKİ DOĞRU ŞEKİLDE EKLENDİ
+        const GITHUB_RAW_URL = "https://raw.githubusercontent.com/burapist97/more_tester/main/sablon.py"; 
+
+        let BASE_PYTHON_TEMPLATE = "# Şablon bekleniyor...\n\n# {{DINAMIK_KODLAR_BURAYA_GELECEK}}";
+        
+        let globalProjectName = "test_script.py";
+        let editingStepData = null; // { caseId, stepId }
+        
+        let appState = {
+            platform: "Android",
+            app_pkg: "",
+            app_act: "",
+            bundle_id: "",
+            cases: [] 
+        };
+
+        // --- GITHUB'DAN ŞABLONU ÇEKME ---
+        async function fetchTemplateFromGitHub() {
+            try {
+                const response = await fetch(GITHUB_RAW_URL);
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                
+                BASE_PYTHON_TEMPLATE = await response.text();
+                console.log("Python şablonu GitHub'dan başarıyla çekildi.");
+            } catch (error) {
+                console.error("Şablon yükleme hatası:", error);
+                alert("GitHub'dan sablon.py dosyası çekilemedi! Lütfen kod içindeki GITHUB_RAW_URL değişkenini kontrol edin.");
+                // Hata olursa varsayılan basit bir şablon ata
+                BASE_PYTHON_TEMPLATE = "# GITHUB BAGLANTI HATASI\nimport time\nprint('Şablon yüklenemedi!')\n\n# {{DINAMIK_KODLAR_BURAYA_GELECEK}}";
+            }
+        }
+
+        function clearAll() {
+            if (appState.cases.length === 0) return;
+            if (confirm("Tüm senaryoları ve adımları silmek istediğinize emin misiniz?")) {
+                appState.cases = [];
+                cancelEdit();
+                renderUI(); 
+            }
+        }
+
+        function updateFileName(newVal) {
+            let cleanVal = newVal.trim();
+            if (cleanVal) {
+                globalProjectName = cleanVal.endsWith(".py") ? cleanVal : cleanVal + ".py";
+                document.getElementById("header-filename-display").value = globalProjectName;
+            } else {
+                document.getElementById("header-filename-display").value = globalProjectName; 
+            }
+        }
+
+        function renameCase(caseId, newName) {
+            const target = appState.cases.find(c => c.id === caseId);
+            if (target) {
+                target.name = newName.trim() || "isimsiz_senaryo";
+                renderUI(); 
+            }
+        }
+
+        function closeStartupModal() {
+            const inputVal = document.getElementById("startup-filename").value.trim();
+            if (inputVal) globalProjectName = inputVal.endsWith(".py") ? inputVal : inputVal + ".py";
+            document.getElementById("header-filename-display").value = globalProjectName;
+            document.getElementById("startup-modal").classList.add("hidden");
+        }
+        document.getElementById("startup-filename").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); closeStartupModal(); }
+        });
+
+        // --- ARAYÜZ (UI) GÜNCELLEMELERİ ---
+        function renderUI() {
+            renderCanvas();
+            if(!editingStepData) { // Düzenleme modundayken dropdown bozulmasın
+                updateTargetCaseDropdown();
+                updatePositionDropdown();
+            }
+            toggleStepFormState(); 
+            
+            document.getElementById("app-pkg").value = appState.app_pkg || "";
+            document.getElementById("app-act").value = appState.app_act || "";
+            document.getElementById("bundle-id").value = appState.bundle_id || "";
+            
+            const platforms = document.getElementsByName("platform");
+            platforms.forEach(p => { p.checked = (p.value === appState.platform); });
+            document.getElementById("android-settings").classList.toggle("hidden", appState.platform !== "Android");
+            document.getElementById("ios-settings").classList.toggle("hidden", appState.platform !== "iOS");
+            document.getElementById("code-platform-title").innerText = appState.platform;
+
+            generatePythonCode();
+        }
+
+        function toggleStepFormState() {
+            const formContainer = document.getElementById("step-form-container");
+            const warningBox = document.getElementById("no-case-warning");
+
+            if (appState.cases.length === 0) {
+                formContainer.classList.add("opacity-50", "pointer-events-none");
+                warningBox.classList.remove("hidden");
+            } else {
+                formContainer.classList.remove("opacity-50", "pointer-events-none");
+                warningBox.classList.add("hidden");
+            }
+        }
+
+        function renderCanvas() {
+            const canvas = document.getElementById("canvas-area");
+            canvas.innerHTML = "";
+
+            if (appState.cases.length === 0) {
+                canvas.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-gray-400 space-y-4"><span class="text-4xl">📭</span><p class="text-sm">Henüz senaryo eklenmedi.</p></div>`;
+                return;
+            }
+
+            appState.cases.forEach((caseItem) => {
+                const caseContainer = document.createElement("div");
+                caseContainer.className = "bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-6";
+                
+                const header = document.createElement("div");
+                header.className = "bg-gray-800 p-3 px-4 flex justify-between items-center";
+                header.innerHTML = `
+                    <div class="font-semibold flex items-center gap-2">
+                        <span class="text-blue-400">#</span>
+                        <input type="text" value="${caseItem.name}" onchange="renameCase('${caseItem.id}', this.value)" class="bg-transparent hover:border-gray-500 focus:border-blue-400 focus:outline-none text-white px-1 py-0.5 text-sm transition-colors w-48 font-mono">
+                    </div>
+                    <button onclick="deleteCase('${caseItem.id}')" class="text-gray-400 hover:text-red-400 text-sm">🗑️</button>
+                `;
+                caseContainer.appendChild(header);
+
+                const stepsWrapper = document.createElement("div");
+                stepsWrapper.className = "p-4 space-y-3";
+
+                if (caseItem.steps.length === 0) {
+                    stepsWrapper.innerHTML = `<div class="text-xs text-gray-400 italic">Bu senaryoda henüz adım yok.</div>`;
+                } else {
+                    caseItem.steps.forEach((step, index) => {
+                        const block = document.createElement("div");
+                        
+                        let colorClass = "step-Bekle"; let icon = "⚙️";
+                        if (step.action === "Tıkla") { colorClass = "step-Tıkla"; icon = "👆"; }
+                        else if (step.action.includes("Metin")) { colorClass = "step-Metin"; icon = "⌨️"; }
+                        else if (step.action === "Kaydır (Swipe)") { colorClass = "step-Kaydır"; icon = "↕️"; }
+                        else if (step.action === "Sistem Tuşu") { colorClass = "step-Sistem"; icon = "📱"; }
+                        else if (step.action === "Başlık / Yorum") { colorClass = "step-Başlık"; icon = "💬"; }
+
+                        // Düzenleme modundaysa bloğu vurgula
+                        const isEditingThis = editingStepData && editingStepData.stepId === step.id;
+                        const editingClass = isEditingThis ? "ring-2 ring-blue-500 shadow-md bg-blue-50/50" : "shadow-sm border border-gray-100";
+
+                        block.className = `border-l-4 rounded-r-md p-3 flex justify-between items-center transition-all ${colorClass} ${editingClass}`;
+                        
+                        let detailText = `<div class="font-medium text-gray-800 mb-1 flex items-center gap-2">${index + 1}. ${icon} ${step.step_name} <span class="text-[10px] font-bold bg-white/50 px-2 py-0.5 rounded border border-black/5 uppercase">${step.action}</span></div>`;
+                        detailText += `<div class="text-xs space-y-0.5 text-gray-600">`;
+                        if (step.xpath) detailText += `<div><span class="font-semibold">Hedef:</span> <span class="font-mono bg-white px-1 rounded">${step.xpath}</span> ${step.exact_match ? '(Tam)' : ''}</div>`;
+                        if (step.x || step.y) detailText += `<div><span class="font-semibold">Koordinat:</span> X:${step.x}, Y:${step.y}</div>`;
+                        if (step.val) detailText += `<div><span class="font-semibold">Değer/Süre:</span> ${step.val}</div>`;
+                        if (step.action === "Sistem Tuşu") detailText += `<div><span class="font-semibold">Tuş:</span> ${step.sys_key}</div>`;
+                        if (step.action === "Kaydır (Swipe)") detailText += `<div><span class="font-semibold">Yön:</span> ${step.direction}</div>`;
+                        detailText += `</div>`;
+
+                        // AKSİYON DÜĞMELERİ (Yukarı, Aşağı, Düzenle, Sil)
+                        block.innerHTML = `
+                            <div class="flex-1 cursor-pointer" onclick="editStep('${caseItem.id}', '${step.id}')">${detailText}</div>
+                            <div class="flex flex-col sm:flex-row gap-1 sm:gap-1.5 ml-3 opacity-60 hover:opacity-100 transition-opacity bg-white p-1 rounded-md border border-gray-200">
+                                <button onclick="moveStep('${caseItem.id}', ${index}, -1)" class="p-1 hover:bg-gray-100 rounded text-gray-600 text-sm" title="Yukarı Taşı">🔼</button>
+                                <button onclick="moveStep('${caseItem.id}', ${index}, 1)" class="p-1 hover:bg-gray-100 rounded text-gray-600 text-sm" title="Aşağı Taşı">🔽</button>
+                                <div class="w-px bg-gray-200 hidden sm:block"></div>
+                                <button onclick="editStep('${caseItem.id}', '${step.id}')" class="p-1 hover:bg-blue-100 rounded text-blue-600 text-sm" title="Düzenle">✏️</button>
+                                <button onclick="deleteStep('${caseItem.id}', '${step.id}')" class="p-1 hover:bg-red-100 rounded text-red-500 text-sm" title="Sil">❌</button>
+                            </div>
+                        `;
+                        stepsWrapper.appendChild(block);
+                    });
+                }
+                
+                caseContainer.appendChild(stepsWrapper);
+                canvas.appendChild(caseContainer);
+            });
+        }
+
+        function toggleFormFields() {
+            const action = document.getElementById("form-action").value;
+            const fields = {
+                xpath: document.getElementById("form-field-xpath"),
+                coords: document.getElementById("form-field-coords"),
+                val: document.getElementById("form-field-val"),
+                count: document.getElementById("form-field-count"),
+                syskey: document.getElementById("form-field-syskey"),
+                direction: document.getElementById("form-field-direction"),
+            };
+
+            Object.values(fields).forEach(f => f.classList.add("hidden"));
+
+            if (action === "Tıkla") { fields.xpath.classList.remove("hidden"); fields.coords.classList.remove("hidden"); }
+            if (action === "Metin Yaz") { fields.xpath.classList.remove("hidden"); fields.val.classList.remove("hidden"); }
+            if (action === "Güvenli Metin Yaz (Fiziksel)") { fields.xpath.classList.remove("hidden"); fields.val.classList.remove("hidden"); fields.count.classList.remove("hidden"); }
+            if (action === "Sistem Tuşu") { fields.syskey.classList.remove("hidden"); fields.xpath.classList.remove("hidden"); fields.count.classList.remove("hidden"); }
+            if (action === "Kaydır (Swipe)") { fields.direction.classList.remove("hidden"); fields.coords.classList.remove("hidden"); fields.count.classList.remove("hidden"); }
+            if (action === "Bekle (Sleep)" || action === "Başlık / Yorum") { fields.val.classList.remove("hidden"); }
+        }
+
+        function updateTargetCaseDropdown() {
+            const select = document.getElementById("target-case-select");
+            const currentVal = select.value;
+            select.innerHTML = "";
+            appState.cases.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.id;
+                opt.innerText = c.name;
+                select.appendChild(opt);
+            });
+            if (currentVal && appState.cases.find(c => c.id === currentVal)) {
+                select.value = currentVal;
+            } else if (appState.cases.length > 0) {
+                select.value = appState.cases[appState.cases.length - 1].id;
+            }
+        }
+
+        // Seçilen senaryodaki adım sayısına göre Konum dropdownunu günceller
+        function updatePositionDropdown() {
+            const select = document.getElementById("form-step-position");
+            const caseId = document.getElementById("target-case-select").value;
+            select.innerHTML = '<option value="-1">Sona Ekle</option>';
+            
+            if (caseId) {
+                const targetCase = appState.cases.find(c => c.id === caseId);
+                if (targetCase && targetCase.steps.length > 0) {
+                    for (let i = 0; i < targetCase.steps.length; i++) {
+                        const opt = document.createElement("option");
+                        opt.value = i;
+                        opt.innerText = `${i + 1}. Sıraya`;
+                        select.appendChild(opt);
+                    }
+                }
+            }
+        }
+
+        function updatePlatform() {
+            const platforms = document.getElementsByName("platform");
+            platforms.forEach(p => { if (p.checked) appState.platform = p.value; });
+            renderUI();
+        }
+
+        function updateSettings() {
+            appState.app_pkg = document.getElementById("app-pkg").value;
+            appState.app_act = document.getElementById("app-act").value;
+            appState.bundle_id = document.getElementById("bundle-id").value;
+            generatePythonCode();
+        }
+
+        function addScenario() {
+            const nameInput = document.getElementById("new-case-name");
+            const caseName = nameInput.value.trim();
+            if (!caseName) return alert("Lütfen senaryo (case) için bir isim girin.");
+            
+            appState.cases.push({ id: "case_" + Date.now(), name: caseName, steps: [] });
+            nameInput.value = ""; 
+            renderUI();
+        }
+
+        function deleteCase(caseId) {
+            appState.cases = appState.cases.filter(c => c.id !== caseId);
+            if(editingStepData && editingStepData.caseId === caseId) cancelEdit();
+            renderUI();
+        }
+
+        // Adım Taşıma Fonksiyonu (Yukarı/Aşağı)
+        function moveStep(caseId, index, direction) {
+            const targetCase = appState.cases.find(c => c.id === caseId);
+            if (!targetCase) return;
+            const steps = targetCase.steps;
+            const newIndex = index + direction;
+            
+            if (newIndex >= 0 && newIndex < steps.length) {
+                // Swap
+                const temp = steps[index];
+                steps[index] = steps[newIndex];
+                steps[newIndex] = temp;
+                renderUI();
+            }
+        }
+
+        // Düzenleme Modunu Aç
+        function editStep(caseId, stepId) {
+            const targetCase = appState.cases.find(c => c.id === caseId);
+            const step = targetCase.steps.find(s => s.id === stepId);
+            
+            // Sol Formu Doldur
+            document.getElementById("target-case-select").value = caseId;
+            updatePositionDropdown(); // senkronize et
+            
+            document.getElementById("form-action").value = step.action;
+            document.getElementById("form-step-name").value = step.step_name;
+            document.getElementById("form-xpath").value = step.xpath || "";
+            document.getElementById("form-exact").checked = step.exact_match || false;
+            document.getElementById("form-x").value = step.x || "";
+            document.getElementById("form-y").value = step.y || "";
+            document.getElementById("form-val").value = step.val || "";
+            document.getElementById("form-count").value = step.count || 1;
+            document.getElementById("form-syskey").value = step.sys_key || "Geri";
+            document.getElementById("form-direction").value = step.direction || "Aşağı";
+            
+            toggleFormFields();
+            editingStepData = { caseId, stepId };
+            
+            // UI Görünümünü Değiştir
+            document.getElementById("btn-add-step").innerText = "Güncelle";
+            document.getElementById("btn-add-step").classList.replace("bg-blue-600", "bg-emerald-600");
+            document.getElementById("btn-add-step").classList.replace("hover:bg-blue-700", "hover:bg-emerald-700");
+            document.getElementById("btn-cancel-edit").classList.remove("hidden");
+            document.getElementById("step-position-container").classList.add("hidden"); // Düzenlerken konum gizlenir
+            
+            document.getElementById("step-form-wrapper").classList.add("bg-emerald-50/50");
+            document.getElementById("form-title-text").innerHTML = "<span class='text-lg'>✏️</span> Adımı Düzenle";
+            
+            renderUI(); // Vurguyu eklemek için canvas'ı tekrar çiz
+        }
+
+        // Düzenleme Modunu İptal Et
+        function cancelEdit() {
+            editingStepData = null;
+            document.getElementById("form-step-name").value = "";
+            document.getElementById("form-xpath").value = "";
+            document.getElementById("form-val").value = "";
+            
+            // UI Görünümünü Geri Yükle
+            document.getElementById("btn-add-step").innerText = "Adımı Ekle";
+            document.getElementById("btn-add-step").classList.replace("bg-emerald-600", "bg-blue-600");
+            document.getElementById("btn-add-step").classList.replace("hover:bg-emerald-700", "hover:bg-blue-700");
+            document.getElementById("btn-cancel-edit").classList.add("hidden");
+            document.getElementById("step-position-container").classList.remove("hidden");
+            
+            document.getElementById("step-form-wrapper").classList.remove("bg-emerald-50/50");
+            document.getElementById("form-title-text").innerHTML = "<span class='text-lg'>🧩</span> Blok (Adım) Ekle";
+            
+            renderUI();
+        }
+
+        // Ekleme (ve araya ekleme) veya Düzenleme Kaydı
+        function saveStep() {
+            const targetCaseId = document.getElementById("target-case-select").value;
+            if (!targetCaseId) return alert("Lütfen önce bir senaryo oluşturun.");
+
+            const stepNameInput = document.getElementById("form-step-name").value;
+            const newStepData = {
+                step_name: stepNameInput || (editingStepData ? "İsimsiz Adım" : "Yeni Adım"),
+                action: document.getElementById("form-action").value,
+                xpath: document.getElementById("form-xpath").value,
+                exact_match: document.getElementById("form-exact").checked,
+                x: parseInt(document.getElementById("form-x").value) || 0,
+                y: parseInt(document.getElementById("form-y").value) || 0,
+                val: document.getElementById("form-val").value,
+                count: parseInt(document.getElementById("form-count").value) || 1,
+                sys_key: document.getElementById("form-syskey").value,
+                direction: document.getElementById("form-direction").value
+            };
+
+            const targetCase = appState.cases.find(c => c.id === targetCaseId);
+
+            if (editingStepData) {
+                // VAR OLANI GÜNCELLE
+                const editCase = appState.cases.find(c => c.id === editingStepData.caseId);
+                const stepIndex = editCase.steps.findIndex(s => s.id === editingStepData.stepId);
+                if(stepIndex > -1) {
+                    editCase.steps[stepIndex] = { ...editCase.steps[stepIndex], ...newStepData };
+                }
+                cancelEdit();
+            } else {
+                // YENİ EKLE (veya Araya Ekle)
+                newStepData.id = "step_" + Date.now();
+                const pos = parseInt(document.getElementById("form-step-position").value);
+                
+                if (pos === -1 || pos >= targetCase.steps.length) {
+                    targetCase.steps.push(newStepData); // Sona Ekle
+                } else {
+                    targetCase.steps.splice(pos, 0, newStepData); // Araya Ekle
+                }
+                
+                // Formu Temizle
+                document.getElementById("form-step-name").value = "";
+                document.getElementById("form-xpath").value = "";
+                document.getElementById("form-val").value = "";
+            }
+            
+            renderUI();
+            setTimeout(() => { const canvas = document.getElementById("canvas-area"); canvas.scrollTop = canvas.scrollHeight; }, 100);
+        }
+
+        function deleteStep(caseId, stepId) {
+            const targetCase = appState.cases.find(c => c.id === caseId);
+            targetCase.steps = targetCase.steps.filter(s => s.id !== stepId);
+            if(editingStepData && editingStepData.stepId === stepId) cancelEdit();
+            renderUI();
+        }
+
+        // --- DOSYA YÜKLEME ---
+        document.getElementById("file-upload").addEventListener("change", function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                globalProjectName = file.name;
+                document.getElementById("header-filename-display").value = globalProjectName;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = e.target.result;
+                    const metaMatch = content.match(/# IDE_METADATA: (.*)/);
+                    if (metaMatch && metaMatch[1]) {
+                        try {
+                            const decodedStr = decodeURIComponent(escape(window.atob(metaMatch[1].trim())));
+                            appState = JSON.parse(decodedStr);
+                            cancelEdit();
+                            renderUI(); 
+                            alert("Proje başarıyla yüklendi!");
+                        } catch (err) { alert("Dosya metadatası okunamadı."); }
+                    } else {
+                        alert("Bu dosya IDE formatında değil, sadece kod olarak görünür.");
+                        document.getElementById("generated-code-block").innerText = content;
+                        window.lastGeneratedCode = content;
+                    }
+                    document.getElementById("file-upload").value = "";
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // --- PYTHON KOD ÜRETİCİSİ (Yeni Sablon.py ye Uyumlu Hale Getirildi) ---
+        function generatePythonCode() {
+            let gen_code = "";
+            if (appState.platform === "Android") {
+                gen_code += "options = UiAutomator2Options()\n";
+                if (appState.app_pkg) gen_code += `options.app_package = '${appState.app_pkg}'\n`;
+                if (appState.app_act) gen_code += `options.app_activity = '${appState.app_act}'\n`;
+            } else {
+                gen_code += "options = XCUITestOptions()\n";
+                if (appState.bundle_id) gen_code += `options.bundle_id = '${appState.bundle_id}'\n`;
+            }
+            gen_code += "options.no_reset = True\n";
+            gen_code += "driver = webdriver.Remote('http://127.0.0.1:4723', options=options)\n";
+            gen_code += "driver.implicitly_wait(10)\n\n";
+
+            let calls = [];
+            if(appState.cases.length === 0) gen_code += "# Henüz senaryo eklenmedi.\n";
+
+            appState.cases.forEach(c => {
+                let c_name = c.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+                if(!c_name) c_name = "func_" + c.id.split("_")[1];
+                calls.push(`    ${c_name}()`);
+                
+                gen_code += `def ${c_name}():\n    try:\n        api_logger.log_message('--- ${c_name.toUpperCase()} BAŞLADI ---')\n`;
+                if (c.steps.length === 0) gen_code += "        pass # Adım yok\n";
+
+                c.steps.forEach((step, s_idx) => {
+                    let act = step.action;
+                    let xp = step.xpath;
+                    let exact = step.exact_match;
+                    
+                    if (act === "Başlık / Yorum") { gen_code += `\n        # --- ${step.val} ---\n`; return; }
+                    
+                    // Sablon.py içindeki akilli_element_bulucu fonksiyonunu kullanıyoruz
+                    const get_finder = (xpath, ex) => ex ? `driver.find_element(by=AppiumBy.XPATH, value=r'''${xpath}''')` : `akilli_element_bulucu(driver, r'''${xpath}''')`;
+                    
+                    if (act === "Tıkla") {
+                        if (step.x > 0 || step.y > 0) {
+                            gen_code += `        driver.tap([(${step.x}, ${step.y})])\n        time.sleep(1)\n`;
+                        } else {
+                            gen_code += `        ${get_finder(xp, exact)}.click()\n        time.sleep(1)\n`;
+                        }
+                    } else if (act === "Metin Yaz" || act === "Güvenli Metin Yaz (Fiziksel)") {
+                        let safe_val = step.val.replace(/'/g, "\\'");
+                        gen_code += `        kutu = ${get_finder(xp, exact)}\n        kutu.click()\n        kutu.clear()\n        kutu.send_keys('${safe_val}')\n`;
+                    } else if (act === "Bekle (Sleep)") {
+                        gen_code += `        time.sleep(${step.val || 1})\n`;
+                    } else if (act === "Kaydır (Swipe)") {
+                        // Arayüzdeki Türkçe yönleri sablon.py'nin anladığı formata (down, up, right, left) çeviriyoruz
+                        const dirMap = {"Aşağı": "down", "Yukarı": "up", "Sağa": "right", "Sola": "left"};
+                        const pyDir = dirMap[step.direction] || "down";
+                        gen_code += `        ekran_kaydir(driver, '${pyDir}', ${step.x || 0}, ${step.y || 0})\n        time.sleep(1)\n`;
+                    }
+                });
+                
+                gen_code += `        api_logger.log_step_passed('${c_name} Başarıyla Tamamlandı')\n    except Exception as e:\n        api_logger.log_message(f'HATA: {e}')\n\n`;
+            });
+
+            gen_code += "try:\n" + (calls.length > 0 ? calls.join("\n") : "    pass") + "\nfinally:\n    api_logger.save_step_count_to_config()\n    driver.quit()\n";
+            
+            // Dinamik Şablon İçine Kodu Gömme
+            const finalCode = BASE_PYTHON_TEMPLATE.replace("# {{DINAMIK_KODLAR_BURAYA_GELECEK}}", gen_code);
+            
+            const metadataStr = JSON.stringify(appState);
+            const base64Meta = window.btoa(unescape(encodeURIComponent(metadataStr)));
+            const codeWithMeta = finalCode + `\n\n# --- IDE GIZLI VERISI (LUTFEN BU SATIRI DEGISTIRMEYIN) ---\n# IDE_METADATA: ${base64Meta}\n`;
+            
+            document.getElementById("generated-code-block").innerText = codeWithMeta;
+            window.lastGeneratedCode = codeWithMeta; 
+        }
+
+        function exportCode() {
+            const blob = new Blob([window.lastGeneratedCode], { type: "text/x-python" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = globalProjectName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- İLK YÜKLEME (ASENKRON OLARAK GÜNCELLENDİ) ---
+        window.onload = async () => { 
+            // 1. Önce kod alanına bilgi mesajı yaz
+            document.getElementById("generated-code-block").innerText = "# Şablon GitHub'dan yükleniyor, lütfen bekleyin...";
+            
+            // 2. Github'dan sablon.py'yi bekle
+            await fetchTemplateFromGitHub();
+            
+            // 3. UI'ı hazırla ve kodu derle
+            toggleFormFields();
+            renderUI(); 
+            document.getElementById("startup-filename").focus();
+        };
+    </script>
+</body>
+</html>
