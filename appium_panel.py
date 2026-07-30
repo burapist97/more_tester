@@ -1,3 +1,315 @@
+import streamlit as st
+import json
+import re
+import os
+
+st.set_page_config(page_title="Görsel Appium IDE", layout="wide", initial_sidebar_state="expanded")
+
+# --- SCRATCH / BLOCKLY CANLI CSS TASARIMI ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #F4F5F7; }
+    
+    .s-block {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-weight: 700;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        box-shadow: inset 0px -3px 0px rgba(0,0,0,0.15), 0px 3px 5px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        font-size: 14px;
+        border: 1px solid rgba(0,0,0,0.1);
+    }
+    
+    .s-setup { background-color: #0FBD8C; font-size: 16px; border-radius: 10px; margin-bottom: 20px;} 
+    .s-case { background-color: #FF6680; font-size: 16px; margin-top: 15px; border-radius: 10px 10px 0 0; } 
+    .s-click { background-color: #4C97FF; } 
+    .s-type { background-color: #59C059; } 
+    .s-secure-type { background-color: #D35400; } /* Maskeli alanlar için yeni renk */
+    .s-swipe { background-color: #FFBF00; color: #333; } 
+    .s-wait { background-color: #9966FF; } 
+    .s-sys { background-color: #8A9BAC; } 
+    .s-clear { background-color: #E74C3C; }
+    .s-comment { background-color: #34495E; color: #F1C40F; border-left: 5px solid #F1C40F;}
+    
+    .s-val {
+        background: white;
+        color: #333;
+        border-radius: 16px;
+        padding: 4px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: inset 0px 2px 3px rgba(0,0,0,0.15);
+        border: 1px solid rgba(0,0,0,0.1);
+        margin-left: auto;
+        max-width: 300px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .edit-box {
+        background-color: #E2E8F0;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 2px;
+        margin-bottom: 10px;
+        border-left: 5px solid #FFBF00;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- HAFIZA (SESSION STATE) ---
+if 'platform' not in st.session_state: st.session_state.platform = "Android"
+if 'app_pkg' not in st.session_state: st.session_state.app_pkg = ""
+if 'app_act' not in st.session_state: st.session_state.app_act = ""
+if 'bundle_id' not in st.session_state: st.session_state.bundle_id = ""
+if 'cases' not in st.session_state: st.session_state.cases = []
+if 'loaded_file' not in st.session_state: st.session_state.loaded_file = None
+if 'editing_step' not in st.session_state: st.session_state.editing_step = None
+if 'export_state' not in st.session_state: st.session_state.export_state = 0
+if 'out_filename' not in st.session_state: st.session_state.out_filename = "otomasyon_testi"
+
+# --- AKILLI İSİMLENDİRME MOTORU ---
+def akilli_isim_uret(action, xpath, val, direction, sys_key, x, y):
+    if action == "Tıkla":
+        if x > 0 or y > 0: return f"Tıkla ({x},{y})"
+        match_text = re.search(r'@text=["\']([^"\']+)["\']', xpath)
+        if match_text: return f"Tıkla: {match_text.group(1)}"
+        match_id = re.search(r'@resource-id=["\']([^"\']+)["\']', xpath)
+        if match_id: return f"Tıkla: {match_id.group(1).split('/')[-1]}"
+        match_desc = re.search(r'@content-desc=["\']([^"\']+)["\']', xpath)
+        if match_desc: return f"Tıkla: {match_desc.group(1)}"
+        if xpath and not xpath.startswith("//") and len(xpath) < 25: return f"Tıkla: {xpath}"
+        return "Tıklama Adımı"
+    elif action == "Metin Yaz": return f"Yaz: '{val}'"
+    elif action == "Güvenli Metin Yaz (Fiziksel)": return f"Güvenli Yaz: '{val}'"
+    elif action == "Kaydır (Swipe)": return f"Kaydır: {direction}"
+    elif action == "Sistem Tuşu": 
+        if sys_key == "Kutuyu Temizle": return "İçeriği Sil"
+        if sys_key == "Fiziksel Sil (Backspace)": return "Fiziksel Olarak Sil"
+        return f"Tuş: {sys_key}"
+    elif action == "Bekle (Sleep)": return f"Bekle: {val} sn"
+    elif action == "Başlık / Yorum": return f"--- {val} ---"
+    return "Yeni Adım"
+
+# --- SOL MENÜ: AKSİYON KÜTÜPHANESİ ---
+with st.sidebar:
+    st.header("📂 Proje Yönetimi")
+    
+    uploaded_file = st.file_uploader("📥 Kayıtlı Testi Yükle (.py)", type="py")
+    if uploaded_file is not None:
+        if st.session_state.loaded_file != uploaded_file.name:
+            try:
+                content = uploaded_file.read().decode("utf-8")
+                match = re.search(r'# --- IDE_METADATA_START ---\s*#\s*(.*)', content, re.DOTALL)
+                if match:
+                    meta_string = match.group(1).strip()
+                    clean_json = "".join([line.replace("#", "").strip() for line in meta_string.splitlines()])
+                    data = json.loads(clean_json)
+                    st.session_state.platform = data.get("platform", "Android")
+                    st.session_state.app_pkg = data.get("app_pkg", "")
+                    st.session_state.app_act = data.get("app_act", "")
+                    st.session_state.bundle_id = data.get("bundle_id", "")
+                    st.session_state.cases = data.get("cases", [])
+                    st.session_state.loaded_file = uploaded_file.name
+                    st.success("Test başarıyla yüklendi!")
+                    st.rerun()
+            except Exception as e: st.error(f"Dosya okunamadı: {e}")
+    else:
+        st.session_state.loaded_file = None
+
+    st.divider()
+    st.header("⚙️ Temel Ayarlar")
+    st.session_state.platform = st.radio("Platform Seçimi:", ["Android", "iOS"], index=0 if st.session_state.platform == "Android" else 1)
+    
+    if st.session_state.platform == "Android":
+        st.session_state.app_pkg = st.text_input("App Package:", st.session_state.app_pkg)
+        st.session_state.app_act = st.text_input("App Activity:", st.session_state.app_act)
+    else:
+        st.session_state.bundle_id = st.text_input("Bundle ID:", st.session_state.bundle_id)
+    
+    st.divider()
+    st.header("🧱 Senaryo Ekle")
+    case_name = st.text_input("Yeni Case Adı:", placeholder="Örn: para_yukleme_testi")
+    if st.button("➕ Yeni Case Oluştur", type="primary", use_container_width=True):
+        if case_name:
+            st.session_state.cases.append({"name": case_name.replace(" ", "_"), "steps": []})
+            st.rerun()
+
+    st.divider()
+    if st.session_state.cases:
+        st.subheader("🧩 Blok Ekle")
+        action = st.selectbox("İşlem Tipi:", [
+            "Tıkla", 
+            "Metin Yaz", 
+            "Güvenli Metin Yaz (Fiziksel)", 
+            "Kaydır (Swipe)", 
+            "Sistem Tuşu", 
+            "Bekle (Sleep)",
+            "Başlık / Yorum"
+        ])
+        step_name = st.text_input("Adım İsmi (Boş: Otomatik):", placeholder="Örn: Ayarlara Tıkla")
+        
+        xpath, val, count, direction, step_x, step_y, sys_key = "", "", 1, "Aşağı", 0, 0, "Geri"
+        exact_match = False
+        
+        if action in ["Tıkla", "Metin Yaz", "Güvenli Metin Yaz (Fiziksel)"]: 
+            xpath = st.text_area("Hedef XPath veya ID:")
+            exact_match = st.checkbox("Kesin Eşleşme (Akıllı Bulucuyu Kapat)")
+            
+            if action == "Tıkla":
+                c1, c2 = st.columns(2)
+                with c1: step_x = st.number_input("X (Koor):", value=0)
+                with c2: step_y = st.number_input("Y (Koor):", value=0)
+            else:
+                val = st.text_input("Yazılacak Değer (Rakamlar vb):")
+                if action == "Güvenli Metin Yaz (Fiziksel)":
+                    count = st.number_input("Yazmadan Önce Kaç Karakter Silinsin?", min_value=1, value=10)
+            
+        elif action == "Kaydır (Swipe)":
+            direction = st.selectbox("Yön:", ["Aşağı", "Yukarı", "Sağa", "Sola"])
+            count = st.number_input("Tekrar Sayısı:", min_value=1, value=1)
+            c1, c2 = st.columns(2)
+            with c1: step_x = st.number_input("Merkez X:", value=0)
+            with c2: step_y = st.number_input("Merkez Y:", value=0)
+            
+        elif action == "Sistem Tuşu":
+            sys_key = st.selectbox("İşlem:", ["Geri", "Ana Sayfa", "Arka Plan", "Klavyeyi Kapat", "Kutuyu Temizle", "Fiziksel Sil (Backspace)"])
+            if sys_key in ["Kutuyu Temizle", "Fiziksel Sil (Backspace)"]:
+                xpath = st.text_area("Silinecek Kutu (XPath/ID):")
+                exact_match = st.checkbox("Kesin Eşleşme")
+                if sys_key == "Fiziksel Sil (Backspace)":
+                    count = st.number_input("Kaç Kere Silme Tuşuna Basılsın?", min_value=1, value=10)
+                
+        elif action == "Bekle (Sleep)": 
+            val = st.number_input("Saniye:", min_value=1, value=1)
+            
+        elif action == "Başlık / Yorum":
+            val = st.text_input("Başlık Metni:", placeholder="Örn: --- KART EKLEME ADIMI ---")
+            
+        # ARAYA EKLEME ÖZELLİĞİ
+        insert_options = ["Sona Ekle"] + [f"{i+1}. Adımdan Önce" for i in range(len(st.session_state.cases[-1]["steps"]))]
+        insert_idx = st.selectbox("Nereye Eklensin?", insert_options)
+
+        if st.button("⬇️ Aktif Case'e Adım Ekle", use_container_width=True):
+            if not step_name:
+                step_name = akilli_isim_uret(action, xpath, val, direction, sys_key, step_x, step_y)
+
+            new_step = {
+                "step_name": step_name, "action": action, "xpath": xpath, "val": str(val), 
+                "count": count, "direction": direction, "x": step_x, "y": step_y, "sys_key": sys_key,
+                "exact_match": exact_match
+            }
+            
+            if insert_idx == "Sona Ekle":
+                st.session_state.cases[-1]["steps"].append(new_step)
+            else:
+                idx = int(insert_idx.split(".")[0]) - 1
+                st.session_state.cases[-1]["steps"].insert(idx, new_step)
+                
+            st.rerun()
+    
+    st.divider()
+    if st.button("🗑️ Tüm Tuvali Temizle"):
+        st.session_state.cases = []
+        st.session_state.loaded_file = None
+        st.session_state.editing_step = None
+        st.session_state.export_state = 0
+        st.rerun()
+
+col_canvas, col_code = st.columns(2)
+
+# --- SOL TARAF: GÖRSEL TUVAL ---
+with col_canvas:
+    st.subheader("🎨 Görsel Test Tuvali")
+    baslat_text = st.session_state.app_pkg if st.session_state.platform == "Android" else st.session_state.bundle_id
+    if not baslat_text: baslat_text = "Tüm Cihaz (OS Level)"
+    st.markdown(f'<div class="s-block s-setup">▶️ Başlat ({st.session_state.platform}): <span class="s-val">{baslat_text}</span></div>', unsafe_allow_html=True)
+    
+    for c_idx, case in enumerate(st.session_state.cases):
+        col_c_name, col_c_del = st.columns([8, 2])
+        with col_c_name: st.markdown(f'<div class="s-block s-case">⚙️ CASE: {case["name"]}</div>', unsafe_allow_html=True)
+        with col_c_del:
+            st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
+            if st.button("🗑️ Sil", key=f"del_c_{c_idx}", use_container_width=True):
+                st.session_state.cases.pop(c_idx)
+                st.session_state.editing_step = None 
+                st.rerun()
+                
+        for s_idx, step in enumerate(case["steps"]):
+            act = step["action"]
+            s_name = step.get("step_name", f"Adım {s_idx+1}")
+            css, icon, info = "s-sys", "⚙️", ""
+            
+            if act == "Tıkla": 
+                css, icon = "s-click", "👆"
+                if step.get("exact_match"): info += " 🔒 Kesin"
+            elif act == "Metin Yaz": css, icon = "s-type", "⌨️"
+            elif act == "Güvenli Metin Yaz (Fiziksel)": css, icon = "s-secure-type", "🤖"
+            elif act == "Kaydır (Swipe)": css, icon = "s-swipe", "↔️"
+            elif act == "Bekle (Sleep)": css, icon = "s-wait", "⏳"
+            elif act == "Başlık / Yorum": css, icon = "s-comment", "📝"
+            elif act == "Sistem Tuşu": 
+                if step.get("sys_key") == "Kutuyu Temizle": css, icon = "s-clear", "🧹"
+                elif step.get("sys_key") == "Fiziksel Sil (Backspace)": css, icon = "s-clear", "🔙"
+                else: css, icon, info = "s-sys", "📱", f'<span class="s-val">{step.get("sys_key", "")}</span>'
+            
+            xp_disp = f'<span class="s-val">{step.get("xpath", "")[:25]}...</span>' if step.get("xpath") else ""
+            val_disp = f'<span class="s-val">{step.get("val", "")}</span>' if step.get("val") and act not in ["Kaydır (Swipe)", "Bekle (Sleep)", "Sistem Tuşu"] else ""
+            
+            html_block = f'<div class="s-block {css}"><span>{icon} <b>{s_name}</b></span> {info} {xp_disp} {val_disp}</div>'
+            
+            # --- YENİ ADIM KONTROL BUTONLARI (YUKARI/AŞAĞI) ---
+            col_block, col_up, col_down, col_edit, col_del = st.columns([6, 0.8, 0.8, 0.8, 0.8])
+            with col_block: st.markdown(html_block, unsafe_allow_html=True)
+            with col_up:
+                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                if st.button("⬆️", key=f"up_{c_idx}_{s_idx}", disabled=(s_idx == 0)):
+                    case["steps"][s_idx], case["steps"][s_idx-1] = case["steps"][s_idx-1], case["steps"][s_idx]
+                    st.rerun()
+            with col_down:
+                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                if st.button("⬇️", key=f"dw_{c_idx}_{s_idx}", disabled=(s_idx == len(case["steps"])-1)):
+                    case["steps"][s_idx], case["steps"][s_idx+1] = case["steps"][s_idx+1], case["steps"][s_idx]
+                    st.rerun()
+            with col_edit:
+                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                if st.button("✏️", key=f"edit_btn_{c_idx}_{s_idx}"):
+                    st.session_state.editing_step = None if st.session_state.editing_step == f"{c_idx}_{s_idx}" else f"{c_idx}_{s_idx}"
+                    st.rerun()
+            with col_del:
+                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True) 
+                if st.button("🗑️", key=f"del_s_{c_idx}_{s_idx}"):
+                    st.session_state.cases[c_idx]["steps"].pop(s_idx)
+                    st.session_state.editing_step = None
+                    st.rerun()
+            
+            # DÜZENLEME EKRANI
+            if st.session_state.editing_step == f"{c_idx}_{s_idx}":
+                st.markdown('<div class="edit-box">', unsafe_allow_html=True)
+                step["step_name"] = st.text_input("Adım Adı:", value=step.get("step_name", ""), key=f"edit_name_{c_idx}_{s_idx}")
+                
+                if act in ["Tıkla", "Metin Yaz", "Güvenli Metin Yaz (Fiziksel)"] or (act == "Sistem Tuşu" and step.get("sys_key") in ["Kutuyu Temizle", "Fiziksel Sil (Backspace)"]):
+                    step["xpath"] = st.text_area("Hedef Veri (JSON/XPATH):", value=step.get("xpath", ""), key=f"edit_xp_{c_idx}_{s_idx}")
+                    step["exact_match"] = st.checkbox("Kesin Eşleşme (Akıllı Bulucuyu Kapat)", value=step.get("exact_match", False), key=f"edit_exact_{c_idx}_{s_idx}")
+                            
+                if act in ["Metin Yaz", "Güvenli Metin Yaz (Fiziksel)", "Başlık / Yorum"]:
+                    step["val"] = st.text_input("Değer / Metin:", value=step.get("val", ""), key=f"edit_val_{c_idx}_{s_idx}")
+                    
+                if act in ["Güvenli Metin Yaz (Fiziksel)", "Kaydır (Swipe)"] or (act == "Sistem Tuşu" and step.get("sys_key") == "Fiziksel Sil (Backspace)"):
+                    step["count"] = st.number_input("Adet / Tekrar:", min_value=1, value=int(step.get("count", 1)), key=f"edit_count_{c_idx}_{s_idx}")
+
+                if st.button("✅ Kaydet ve Kapat", key=f"save_{c_idx}_{s_idx}", use_container_width=True):
+                    st.session_state.editing_step = None
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
 # --- SAĞ TARAF: ÜRETİLEN PYTHON KODU ---
 with col_code:
     st.subheader(f"📄 Üretilen Python Kodu ({st.session_state.platform})")
